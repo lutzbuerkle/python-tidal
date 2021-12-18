@@ -246,11 +246,11 @@ class Session(object):
         self.refresh_token = refresh_token
         self.expiry_time = expiry_time
 
-        request = self.request.request('GET', 'sessions')
-        json = request.json()
+        request = self.request.basic_request('GET', 'sessions', None, None, None)
         if not request.ok:
             return False
 
+        json = request.json()
         self.session_id = json['sessionId']
         self.country_code = json['countryCode']
         self.user = tidalapi.User(self, user_id=json['userId']).factory()
