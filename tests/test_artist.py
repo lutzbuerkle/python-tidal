@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019-2020 morguldir
+# Copyright (C) 2019-2022 morguldir
 # Copyright (C) 2014 Thomas Amland
 #
 # This program is free software: you can redistribute it and/or modify
@@ -124,9 +124,9 @@ def test_get_similar(session):
 
 
 def test_get_radio(session):
-    artist = session.artist(4822757)
+    artist = session.artist(19275)
     radio = artist.get_radio()
-    assert len(radio) == 99
+    assert len(radio) == 100
     assert radio[0].artist.name == artist.name
 
 

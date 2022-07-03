@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019-2020 morguldir
+# Copyright (C) 2019-2022 morguldir
 # Copyright (C) 2014 Thomas Amland
 #
 # This program is free software: you can redistribute it and/or modify
@@ -22,6 +22,8 @@ A module containing functions relating to TIDAL api requests.
 
 import json
 import logging
+import requests
+
 try:
     from urlparse import urljoin
 except ImportError:
@@ -60,11 +62,21 @@ class Requests(object):
         request = self.session.request_session.request(method, url, params=request_params, data=data, headers=headers)
 
         refresh_token = self.session.refresh_token
-        if not request.ok and request.json()['userMessage'].startswith("The token has expired.") and refresh_token:
-            log.debug("The access token has expired, trying to refresh it.")
-            refreshed = self.session.token_refresh(refresh_token)
-            if refreshed:
-                request = self.basic_request(method, url, params, data, headers)
+        if not request.ok and refresh_token:
+            json_resp = None
+            try:
+                json_resp = request.json()
+            except requests.JSONDecodeError:
+                pass
+
+            if json_resp and json_resp.get('userMessage', '').startswith("The token has expired."):
+                log.debug("The access token has expired, trying to refresh it.")
+                refreshed = self.session.token_refresh(refresh_token)
+                if refreshed:
+                    request = self.basic_request(method, url, params, data, headers)
+            else:
+                log.warning('HTTP error on %d', request.status_code)
+                log.debug('Response text\n%s', request.text)
 
         return request
 
@@ -106,7 +118,7 @@ class Requests(object):
         return self.map_json(json_obj, parse=parse)
 
     @classmethod
-    def map_json(cls, json_obj, parse=None):
+    def map_json(cls, json_obj, parse=None, session=None):
         items = json_obj.get('items')
 
         if items is None:
@@ -118,8 +130,12 @@ class Requests(object):
                 for item in items:
                     item['item']['dateAdded'] = item['created']
 
-            maps = map(parse, [item['item'] for item in items])
-            lists = list(maps)
+            lists = []
+            for item in items:
+                if session is not None:
+                    parse = session.convert_type(item['type'].lower() + 's', output='parse')
+                lists.append(parse(item['item']))
+
             return lists
         return list(map(parse, items))
 
@@ -145,6 +161,5 @@ class Requests(object):
             items = self.map_request(url, params=params, parse=parse)
             remaining = len(items)
             params['offset'] += 100
-            for item in items:
-                item_list.append(item)
+            item_list.extend(items or [])
         return item_list

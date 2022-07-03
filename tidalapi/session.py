@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2019-2020 morguldir
+# Copyright (C) 2019-2022 morguldir
 # Copyright (C) 2014 Thomas Amland
 #
 # This program is free software: you can redistribute it and/or modify
@@ -37,6 +37,7 @@ import tidalapi.media
 import tidalapi.artist
 import tidalapi.album
 import tidalapi.genre
+import tidalapi.mix
 
 try:
     from urlparse import urljoin
@@ -49,7 +50,8 @@ SearchTypes = [tidalapi.artist.Artist,
                tidalapi.album.Album,
                tidalapi.media.Track,
                tidalapi.media.Video,
-               tidalapi.playlist.Playlist]
+               tidalapi.playlist.Playlist,
+               None]
 
 
 class Quality(Enum):
@@ -156,6 +158,12 @@ class Config(object):
         self.client_id = self.api_token
 
 
+class Case(Enum):
+    pascal = id
+    scream = id
+    lower = id
+
+
 class Session(object):
     """
     Object for interacting with the TIDAL api and
@@ -191,18 +199,36 @@ class Session(object):
         self.parse_track = self.track().parse_track
         self.parse_video = self.video().parse_video
         self.parse_media = self.track().parse_media
+        self.parse_mix = self.mix().parse
 
         self.parse_user = tidalapi.User(self, None).parse
+        self.page = tidalapi.Page(self, None)
+        self.parse_page = self.page.parse
 
         # Dictionary to convert between models from this library, to the text they, and to the parsing function.
         # It also helps in converting the other way around. All the information about artist is stored at the
         # Same index, which means you can get the index of the model, and then get the text using that index.
         # There probably is a better way to do this, but this was sadly the most readable way i found of doing it.
         self.type_conversions = {
-            'identifier': ['artists', 'albums', 'tracks', 'videos', 'playlists'],
+            'identifier': ['artists', 'albums', 'tracks', 'videos', 'playlists', 'mixs'],
             'type': SearchTypes,
-            'parse': [self.parse_artist, self.parse_album, self.parse_track, self.parse_video, self.parse_playlist]
+            'parse': [self.parse_artist, self.parse_album, self.parse_track,
+                      self.parse_video, self.parse_playlist, self.parse_mix]
         }
+
+    def convert_type(self, search, search_type='identifier', output='identifier', case=Case.lower, suffix=True):
+        index = self.type_conversions[search_type].index(search)
+        result = self.type_conversions[output][index]
+
+        if output == 'identifier':
+            if suffix is False:
+                result = result.strip('s')
+            if case == Case.scream:
+                result = result.lower()
+            elif case == Case.pascal:
+                result = result[0].upper() + result[1:]
+
+        return result
 
     def load_session(self, session_id, country_code=None, user_id=None):
         """
@@ -246,11 +272,11 @@ class Session(object):
         self.refresh_token = refresh_token
         self.expiry_time = expiry_time
 
-        request = self.request.basic_request('GET', 'sessions', None, None, None)
+        request = self.request.request('GET', 'sessions')
+        json = request.json()
         if not request.ok:
             return False
 
-        json = request.json()
         self.session_id = json['sessionId']
         self.country_code = json['countryCode']
         self.user = tidalapi.User(self, user_id=json['userId']).factory()
@@ -408,8 +434,7 @@ class Session(object):
         for model in models:
             if model not in SearchTypes:
                 raise ValueError("Tried to search for an invalid type")
-            index = self.type_conversions['type'].index(model)
-            types.append(self.type_conversions['identifier'][index])
+            types.append(self.convert_type(model, 'type'))
 
         params = {
             'query': query,
@@ -430,9 +455,9 @@ class Session(object):
 
         # Find the type of the top hit so we can parse it
         if json_obj['topHit']:
-            index = self.type_conversions['identifier'].index(json_obj['topHit']['type'].lower())
-            parse_top_hit = self.type_conversions['parse'][index]
-            result['top_hit'] = self.request.map_json(json_obj['topHit']['value'], parse_top_hit)
+            top_type = json_obj['topHit']['type'].lower()
+            parse = self.convert_type(top_type, output='parse')
+            result['top_hit'] = self.request.map_json(json_obj['topHit']['value'], parse)
         else:
             result['top_hit'] = None
 
@@ -455,16 +480,23 @@ class Session(object):
 
         return tidalapi.Playlist(session=self, playlist_id=playlist_id).factory()
 
-    def track(self, track_id=None):
+    def track(self, track_id=None, with_album=False):
         """
         Function to create a Track object with access to the session instance in a smoother way.
         Calls :class:`tidalapi.Track(session=session, track_id=track_id) <.Track>` internally
 
         :param track_id: (Optional) The TIDAL id of the Track. You may want access to the methods without an id.
+        :param with_album: (Optional) Whether to fetch the complete :class:`.Album` for the track or not
         :return: Returns a :class:`.Track` object that has access to the session instance used.
         """
 
-        return tidalapi.Track(session=self, media_id=track_id)
+        item = tidalapi.Track(session=self, media_id=track_id)
+        if item.album and with_album:
+            album = self.album(item.album.id)
+            if album:
+                item.album = album
+
+        return item
 
     def video(self, video_id=None):
         """
@@ -499,6 +531,17 @@ class Session(object):
 
         return tidalapi.Album(session=self, album_id=album_id)
 
+    def mix(self, mix_id=None):
+        """
+        Function to create a mix object with access to the session instance smoothly
+        Calls :class:`tidalapi.Mix(session=session, mix_id=mix_id) <.Album>` internally
+
+        :param mix_id: (Optional) The TIDAL id of the Mix. You may want access to the mix methods without an id.
+        :return: Returns a :class:`.Mix` object that has access to the session instance used.
+        """
+
+        return tidalapi.Mix(session=self, mix_id=mix_id)
+
     def get_user(self, user_id=None):
         """
         Function to create a User object with access to the session instance in a smoother way.
@@ -509,3 +552,59 @@ class Session(object):
         """
 
         return tidalapi.User(session=self, user_id=user_id).factory()
+
+    def home(self):
+        """
+        Retrieves the Home page, as seen on https://listen.tidal.com
+
+        :return: A :class:`.Page` object with the :class:`.PageCategory` list from the home page
+        """
+        return self.page.get("pages/home")
+
+    def explore(self):
+        """
+        Retrieves the Explore page, as seen on https://listen.tidal.com/view/pages/explore
+
+        :return: A :class:`.Page` object with the :class:`.PageCategory` list from the explore page
+        """
+        return self.page.get("pages/explore")
+
+    def videos(self):
+        """
+        Retrieves the :class:`Videos<.Video>` page, as seen on https://listen.tidal.com/view/pages/videos
+
+        :return: A :class:`.Page` object with a :class:`<.PageCategory>` list from the videos page
+        """
+        return self.page.get("pages/videos")
+
+    def genres(self):
+        """
+        Retrieves the global Genre page, as seen on https://listen.tidal.com/view/pages/genre_page
+
+        :return: A :class:`.Page` object with the :class:`.PageCategory` list from the genre page
+        """
+        return self.page.get("pages/genre_page")
+
+    def local_genres(self):
+        """
+        Retrieves the local Genre page, as seen on https://listen.tidal.com/view/pages/genre_page_local
+
+        :return: A :class:`.Page` object with the :class:`.PageLinks` list from the local genre page
+        """
+        return self.page.get("pages/genre_page_local")
+
+    def moods(self):
+        """
+        Retrieves the mood page, as seen on https://listen.tidal.com/view/pages/moods
+
+        :return: A :class:`.Page` object with the :class:`.PageLinks` list from the moods page
+        """
+        return self.page.get("pages/moods")
+
+    def mixes(self):
+        """
+        Retrieves the current users mixes, as seen on https://listen.tidal.com/view/pages/my_collection_my_mixes
+
+        :return: A list of :class:`.Mix`
+        """
+        return self.page.get("pages/my_collection_my_mixes")

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2019-2020 morguldir
+# Copyright (C) 2019-2022 morguldir
 # Copyright (C) 2014 Thomas Amland
 #
 # This program is free software: you can redistribute it and/or modify
@@ -120,7 +120,7 @@ class LoggedInUser(FetchedUser):
 
         :return: Returns a list of :class:`~tidalapi.playlist.Playlist` objects containing the playlists.
         """
-        return self.request.map_request('users/%s/playlists' % self.id, parse=self.playlist.parse)
+        return self.request.map_request('users/%s/playlists' % self.id, parse=self.playlist.parse_factory)
 
     def playlist_and_favorite_playlists(self, offset=0):
         """
@@ -138,7 +138,7 @@ class LoggedInUser(FetchedUser):
             item['playlist']['dateAdded'] = item['created']
             json_obj['items'][index] = item['playlist']
 
-        return self.request.map_json(json_obj, parse=self.playlist.parse)
+        return self.request.map_json(json_obj, parse=self.playlist.parse_factory)
 
     def create_playlist(self, title, description):
         data = {'title': title, 'description': description}

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2019-2020 morguldir
+# Copyright (C) 2019-2022 morguldir
 # Copyright (C) 2014 Thomas Amland
 #
 # This program is free software: you can redistribute it and/or modify
@@ -47,6 +47,8 @@ class Media(object):
     explicit = False
     popularity = -1
     artist = None
+    #: For the artist credit page
+    artist_roles = None
     artists = None
     album = None
     type = None
@@ -103,6 +105,8 @@ class Media(object):
         self.album = album
         self.type = json_obj.get('type')
 
+        self.artist_roles = json_obj.get('artistRoles')
+
     def parse_media(self, json_obj):
         """
         Selects the media type when checking lists that can contain both.
@@ -130,11 +134,13 @@ class Track(Media):
     def parse_track(self, json_obj):
         Media.parse(self, json_obj)
         self.replay_gain = json_obj['replayGain']
-        self.peak = json_obj['peak']
-        self.isrc = json_obj['isrc']
+        # Tracks from the pages endpoints might not actually exist
+        if 'peak' in json_obj and 'isrc' in json_obj:
+            self.peak = json_obj['peak']
+            self.isrc = json_obj['isrc']
+            self.copyright = json_obj['copyright']
         self.audio_quality = tidalapi.Quality(json_obj['audioQuality'])
         self.version = json_obj['version']
-        self.copyright = json_obj['copyright']
 
         return copy.copy(self)
 
@@ -157,6 +163,37 @@ class Track(Media):
         request = self.requests.request('GET', 'tracks/%s/urlpostpaywall' % self.id, params)
         return request.json()['urls'][0]
 
+    def lyrics(self):
+        """
+        Retrieves the lyrics for a song
+
+        :return: A :class:`Lyrics` object containing the lyrics
+        :raises: A :class:`requests.HTTPError` if there aren't any lyrics
+        """
+        return self.requests.map_request('tracks/%s/lyrics' % self.id, parse=Lyrics().parse)
+
+
+class Lyrics(object):
+    track_id = -1
+    provider = ""
+    provider_track_id = -1
+    provider_lyrics_id = -1
+    text = ""
+    #: Contains timestamps as well
+    subtitles = ""
+    right_to_left = False
+
+    def parse(self, json_obj):
+        self.track_id = json_obj['trackId']
+        self.provider = json_obj['lyricsProvider']
+        self.provider_track_id = json_obj['providerCommontrackId']
+        self.provider_lyrics_id = json_obj['providerLyricsId']
+        self.text = json_obj['lyrics']
+        self.subtitles = json_obj['subtitles']
+        self.right_to_left = bool(json_obj['isRightToLeft'])
+
+        return copy.copy(self)
+
 
 class Video(Media):
     """
@@ -170,8 +207,9 @@ class Video(Media):
         Media.parse(self, json_obj)
         release_date = json_obj.get('releaseDate')
         self.release_date = dateutil.parser.isoparse(release_date) if release_date else None
-        self.video_quality = json_obj['quality']
         self.cover = json_obj['imageId']
+        # Videos found in the /pages endpoints don't have quality
+        self.video_quality = json_obj.get('quality')
 
         return copy.copy(self)
 

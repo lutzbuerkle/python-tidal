@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2019-2020 morguldir
+# Copyright (C) 2019-2022 morguldir
 # Copyright (C) 2014 Thomas Amland
 #
 # This program is free software: you can redistribute it and/or modify
@@ -71,17 +71,17 @@ class Playlist(object):
         self.num_videos = int(json_obj['numberOfVideos'])
         self.description = json_obj['description']
         self.duration = int(json_obj['duration'])
-        self.last_updated = dateutil.parser.isoparse(json_obj['lastUpdated'])
-        self.created = dateutil.parser.isoparse(json_obj['created'])
+
+        # These can be missing on from the /pages endpoints
+        last_updated = json_obj.get('lastUpdated')
+        self.last_updated = dateutil.parser.isoparse(last_updated) if last_updated else None
+        created = json_obj.get('created')
+        self.created = dateutil.parser.isoparse(created) if created else None
+        public = json_obj.get('publicPlaylist')
+        self.public = None if public is None else bool(public)
+        self.popularity = json_obj.get('popularity')
+
         self.type = json_obj['type']
-        self.public = bool(json_obj['publicPlaylist'])
-        self.popularity = json_obj['popularity']
-
-        if self.type == 'ARTIST' and json_obj['creator'].get('id'):
-            self.creator = self.session.parse_artist(json_obj['creator'])
-        else:
-            self.creator = self.session.parse_user(json_obj['creator'])
-
         self.picture = json_obj['image']
         self.square_picture = json_obj['squareImage']
 
@@ -94,6 +94,12 @@ class Playlist(object):
         user_date_added = json_obj.get('dateAdded')
         self.user_date_added = dateutil.parser.isoparse(user_date_added) if user_date_added else None
 
+        creator = json_obj.get('creator')
+        if self.type == 'ARTIST' and creator and creator.get('id'):
+            self.creator = self.session.parse_artist(creator)
+        else:
+            self.creator = self.session.parse_user(creator) if creator else None
+
         return copy.copy(self)
 
     def factory(self):
@@ -101,6 +107,10 @@ class Playlist(object):
             return UserPlaylist(self.session, self.id)
 
         return self
+
+    def parse_factory(self, json_obj):
+        self.parse(json_obj)
+        return copy.copy(self.factory())
 
     def tracks(self, limit=None, offset=0):
         """

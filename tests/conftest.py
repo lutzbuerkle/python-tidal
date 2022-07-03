@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019-2020 morguldir
+# Copyright (C) 2019-2022 morguldir
 # Copyright (C) 2014 Thomas Amland
 #
 # This program is free software: you can redistribute it and/or modify
@@ -29,11 +29,15 @@ import tidalapi
 @pytest.fixture(scope='session')
 def session(request):
     logging.basicConfig(level=logging.DEBUG)
-    access_token, refresh_token, session_id, token_type = get_credentials()
+    return login(request)
+
+
+def login(request):
+    access_token, refresh_token, expiry_time, token_type = get_credentials()
     config = tidalapi.Config(quality=tidalapi.Quality.master)
     tidal_session = tidalapi.Session(config)
 
-    if access_token and tidal_session.load_oauth_session(session_id, token_type, access_token, refresh_token):
+    if access_token and tidal_session.load_oauth_session(token_type, access_token, refresh_token, expiry_time):
         return tidal_session
 
     else:
@@ -41,8 +45,8 @@ def session(request):
         info = [
             tidal_session.access_token,
             tidal_session.refresh_token,
-            tidal_session.session_id,
-            tidal_session.token_type
+            tidal_session.token_type,
+            str(tidal_session.expiry_time)
         ]
         if not isinstance(keyring.get_keyring(), keyring.backends.fail.Keyring):
             keyring.set_password('TIDAL Access Token', tidal_session.user.email, ':'.join(info))
@@ -77,6 +81,18 @@ def get_credentials():
     info = info.split(':')
     access_key = info[0]
     refresh_key = info[1]
-    session_id = info[2]
+    expiry_time = info[2]
     token_type = info[3]
-    return access_key, refresh_key, session_id, token_type
+    return access_key, refresh_key, expiry_time, token_type
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--interactive"):
+        return
+    for item in items:
+        if "interactive" in item.keywords:
+            item.add_marker(pytest.mark.skip(reason="Skipping interactive tests"))
+
+
+def pytest_addoption(parser):
+    parser.addoption("--interactive", action="store_true", default=False, help="Run tests that require user input")

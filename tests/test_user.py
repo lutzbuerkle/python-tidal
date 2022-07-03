@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019-2020 morguldir
+# Copyright (C) 2019-2022 morguldir
 # Copyright (C) 2014 Thomas Amland
 #
 # This program is free software: you can redistribute it and/or modify
@@ -46,7 +46,7 @@ def test_get_user_playlists(session):
     user_playlists_and_favorite_playlists = session.user.playlist_and_favorite_playlists()
     for item in user_playlists + user_favorite_playlists:
         assert any(item.id == playlist.id for playlist in user_playlists_and_favorite_playlists)
-    assert len(user_playlists) + len(user_favorite_playlists) == len(user_playlists_and_favorite_playlists)
+    assert len(user_playlists + user_favorite_playlists) - 1 == len(user_playlists_and_favorite_playlists)
 
 
 def test_get_user_playlist_creator(session):
@@ -94,6 +94,7 @@ def test_create_playlist(session):
     assert playlist.description == "testing1234"
 
     assert any([playlist.id == user_playlist.id for user_playlist in session.user.playlists()])
+    assert any([isinstance(user_playlist, tidalapi.UserPlaylist)] for user_playlist in session.user.playlists())
 
     long_playlist = session.playlist("944dd087-f65c-4954-a9a3-042a574e86e3")
     playlist_tracks = long_playlist.tracks(limit=250)

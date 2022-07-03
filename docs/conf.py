@@ -18,18 +18,26 @@ sys.path.insert(0, os.path.abspath('../'))
 # -- Project information -----------------------------------------------------
 
 project = 'tidalapi'
-copyright = '2014-2020, Thomas Amland, morguldir'
+copyright = '2014-2022, Thomas Amland, morguldir'
 author = 'Thomas Amland, morguldir'
 
 # The full version, including alpha/beta/rc tags
-release = '0.7.0'
+release = '0.7.0rc1'
 
 
 # -- General configuration ---------------------------------------------------
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode', 'sphinx.ext.intersphinx']
+extensions = [
+    'sphinx.ext.autodoc',
+    'sphinx.ext.viewcode',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.autosectionlabel',
+    'sphinx.ext.doctest'
+]
+
+intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
 
 autodoc_member_order = 'bysource'
 
@@ -51,16 +59,10 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # a list of builtin themes.
 html_theme = 'sphinx_rtd_theme'
 
-#html_sidebars = { '**': ['globaltoc.html', 'localtoc.html', 'relations.html', 'sourcelink.html', 'searchbox.html'] }
-
 html_theme_options = {
     'display_version': True,
     'sticky_navigation': True,
     'collapse_navigation': False,
-    #'includehidden': True,
-    #'titles_only': False,
-    #"body_min_width": "0%",
-    #"body_max_width": "100%",
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,

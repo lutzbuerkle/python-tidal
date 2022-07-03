@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019-2020 morguldir
+# Copyright (C) 2019-2022 morguldir
 # Copyright (C) 2014 Thomas Amland
 #
 # This program is free software: you can redistribute it and/or modify
@@ -18,6 +18,9 @@
 
 import datetime
 import pytest
+from dateutil import tz
+
+import tidalapi
 from .cover import verify_image_cover, verify_video_cover
 
 
@@ -25,7 +28,7 @@ def test_album(session):
     album = session.album(17927863)
     assert album.id == 17927863
     assert album.name == 'Some Things (Deluxe)'
-    assert album.duration == 6704
+    assert album.duration == 6712
     assert album.available
     assert album.num_tracks == 22
     assert album.num_videos == 0
@@ -81,3 +84,22 @@ def test_image_cover(session):
 
 def test_video_cover(session):
     verify_video_cover(session.album(108043414), [80, 160, 320, 640, 1280])
+
+
+def test_no_release_date(session):
+    album = session.album(174114082)
+    assert album.release_date is None
+    assert album.tidal_release_date
+    assert album.available_release_date == datetime.datetime(year=2021, month=3, day=9, tzinfo=tz.tzutc())
+
+
+def test_no_cover(session):
+    album = session.album(82804683)
+    assert album.cover is None
+    assert album.image(1280) == tidalapi.album.DEFAULT_ALBUM_IMAGE
+
+
+def test_similar(session):
+    album = session.album(108043414)
+    for alb in album.similar():
+        assert isinstance(alb.similar()[0], tidalapi.Album)

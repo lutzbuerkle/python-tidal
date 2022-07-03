@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019-2020 morguldir
+# Copyright (C) 2019-2022 morguldir
 # Copyright (C) 2014 Thomas Amland
 #
 # This program is free software: you can redistribute it and/or modify
@@ -17,6 +17,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import datetime
+
+import requests
 from dateutil import tz
 import pytest
 import tidalapi
@@ -57,13 +59,44 @@ def test_track_url(session):
     assert 'audio.tidal.com' in track.get_url()
 
 
+def test_lyrics(session):
+    track = session.track(56480040)
+    lyrics = track.lyrics()
+    assert "Think we're there" in lyrics.text
+    assert "Think we're there" in lyrics.subtitles
+    assert lyrics.right_to_left is False
+
+
+def test_no_lyrics(session):
+    track = session.track(115105969)
+    with pytest.raises(requests.HTTPError) as exception:
+        track.lyrics()
+
+    assert exception.value.response.status_code == 404
+
+
+def test_right_to_left(session):
+    lyrics = session.track(95948697).lyrics()
+    assert lyrics.right_to_left
+    assert "أديني جيت" in lyrics.text
+
+
+def test_track_with_album(session):
+    track_id = 142278122
+    track = session.track(track_id)
+    print(track.album)
+    assert track.album.duration is None
+    track = session.track(track_id, True)
+    assert track.album.duration == 221
+
+
 def test_video(session):
     video = session.video(125506698)
 
     assert video.id == 125506698
     assert video.name == "Alone, Pt. II"
-    assert video.track_num == 1
-    assert video.volume_num == 1
+    assert video.track_num == 0
+    assert video.volume_num == 0
     assert video.release_date == datetime(2019, 12, 26, tzinfo=tz.tzutc())
     assert video.tidal_release_date == datetime(2019, 12, 27, 9, tzinfo=tz.tzutc())
     assert video.duration == 237

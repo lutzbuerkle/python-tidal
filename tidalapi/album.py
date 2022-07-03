@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2019-2020 morguldir
+# Copyright (C) 2019-2022 morguldir
 # Copyright (C) 2014 Thomas Amland
 #
 # This program is free software: you can redistribute it and/or modify
@@ -18,6 +18,8 @@
 
 import copy
 import dateutil.parser
+
+DEFAULT_ALBUM_IMAGE = "https://tidal.com/browse/assets/images/defaultImages/defaultAlbumImage.png"
 
 
 class Album(object):
@@ -98,6 +100,28 @@ class Album(object):
 
         return copy.copy(self)
 
+    @property
+    def year(self):
+        """
+        Convenience function to get the year using :class:`available_release_date`
+
+        :return: An :any:`python:int` containing the year the track was released
+        """
+        return self.available_release_date.year if self.available_release_date else None
+
+    @property
+    def available_release_date(self):
+        """
+        Get the release date if it's available, otherwise get the day it was released on TIDAL
+
+        :return: A :any:`python:datetime.datetime` object with the release date, or the tidal release date, can be None
+        """
+        if self.release_date:
+            return self.release_date
+        if self.tidal_release_date:
+            return self.tidal_release_date
+        return None
+
     def tracks(self, limit=None, offset=0):
         """
         Returns the tracks in classes album.
@@ -119,7 +143,7 @@ class Album(object):
         params = {'offset': offset, 'limit': limit}
         return self.requests.map_request('albums/%s/items' % self.id, params=params, parse=self.session.parse_media)
 
-    def image(self, dimensions):
+    def image(self, dimensions, default=DEFAULT_ALBUM_IMAGE):
         """
         A url to an album image cover
 
@@ -129,6 +153,9 @@ class Album(object):
 
         Valid resolutions: 80x80, 160x160, 320x320, 640x640, 1280x1280
         """
+        if not self.cover:
+            return default
+
         if dimensions not in [80, 160, 320, 640, 1280]:
             raise ValueError("Invalid resolution {0} x {0}".format(dimensions))
 
@@ -151,3 +178,19 @@ class Album(object):
             raise ValueError("Invalid resolution {0} x {0}".format(dimensions))
 
         return self.session.config.video_url % (self.video_cover.replace('-', '/'), dimensions, dimensions)
+
+    def page(self):
+        """
+        Retrieve the album page as seen on https://listen.tidal.com/album/$id
+
+        :return: A :class:`Page` containing the different categories, e.g. similar artists and albums
+        """
+        return self.session.page.get("pages/album", params={"albumId": self.id})
+
+    def similar(self):
+        """
+        Retrieve albums similar to the current one
+
+        :return: A :any:`list` of similar albums
+        """
+        return self.requests.map_request('albums/%s/similar' % self.id, parse=self.session.parse_album)

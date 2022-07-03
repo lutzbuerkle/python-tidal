@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2019-2020 morguldir
+# Copyright (C) 2019-2022 morguldir
 # Copyright (C) 2014 Thomas Amland
 #
 # This program is free software: you can redistribute it and/or modify
@@ -172,6 +172,14 @@ class Artist(object):
             self.picture = json.get('picture')
 
         return self.session.config.image_url % (self.picture.replace('-', '/'), dimensions, dimensions)
+
+    def page(self):
+        """
+        Retrieve the artist page as seen on https://listen.tidal.com/artist/$id
+
+        :return: A :class:`.Page` containing all the categories from the page, e.g. tracks, influencers and credits
+        """
+        return self.session.page.get("pages/artist", params={"artistId": self.id})
 
 
 class Role(Enum):

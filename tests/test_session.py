@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019-2020 morguldir
+# Copyright (C) 2019-2022 morguldir
 # Copyright (C) 2014 Thomas Amland
 #
 # This program is free software: you can redistribute it and/or modify
@@ -25,14 +25,13 @@ from tidalapi import Artist, Album, Playlist, Track, Video
 
 
 def test_load_oauth_session(session):
-    session_id = session.session_id
     token_type = session.token_type
     access_token = session.access_token
+    expiry_time = session.expiry_time
     session = tidalapi.Session()
-    assert session.load_oauth_session(session_id, token_type, access_token)
+    assert session.load_oauth_session(token_type, access_token, expiry_time)
     assert session.check_login()
     assert isinstance(session.user, tidalapi.LoggedInUser)
-    assert session.load_oauth_session(session_id + "f", token_type, access_token) is False
 
 
 def test_failed_login():
@@ -42,6 +41,7 @@ def test_failed_login():
     assert session.check_login() is False
 
 
+@pytest.mark.interactive
 def test_oauth_login(capsys):
     config = tidalapi.Config(item_limit=20000)
     session = tidalapi.Session(config)
@@ -62,6 +62,7 @@ def test_failed_oauth_login(session):
         session.login_oauth()
 
 
+@pytest.mark.interactive
 def test_oauth_login_simple(capsys):
     session = tidalapi.Session()
     with capsys.disabled():
@@ -91,7 +92,7 @@ def test_search(session):
     assert isinstance(search['videos'][0], Video)
     assert isinstance(search['playlists'][0], Playlist)
 
-    assert (search['top_hit']).name == "Alan Walker"
+    assert (search['top_hit']).name == "Walker Hayes"
 
 
 def test_type_search(session):
