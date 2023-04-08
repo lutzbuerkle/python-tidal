@@ -68,21 +68,13 @@ class User(object):
 class FetchedUser(User):
     first_name = None
     last_name = None
-    picture_id = None
 
     def parse(self, json_obj):
         self.id = json_obj['id']
         self.first_name = json_obj['firstName']
         self.last_name = json_obj['lastName']
-        self.picture_id = json_obj['picture']
 
         return copy(self)
-
-    def image(self, dimensions):
-        if dimensions not in [100, 210, 600]:
-            raise ValueError("Invalid resolution {0} x {0}".format(dimensions))
-
-        return self.session.config.image_url % (self.picture_id.replace('-', '/'), dimensions, dimensions)
 
 
 class LoggedInUser(FetchedUser):
